@@ -20,3 +20,5 @@ export interface NavItem {
   href: string;
   icon?: string;
 }
+
+export * from './admin';
