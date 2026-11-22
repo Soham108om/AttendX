@@ -439,8 +439,53 @@ class FacultyService:
         faculty_id: UUID,
         session_id: UUID,
     ) -> List[FacultyAttendanceRecordResponse]:
-        await cls.get_session(faculty_id, session_id)
+        session = await cls.get_session(faculty_id, session_id)
         admin = cls._admin()
+        try:
+            assignment_response = (
+                admin.from_("faculty_subject_assignments")
+                .select("class_id")
+                .eq("id", str(session.assignment_id))
+                .single()
+                .execute()
+            )
+        except Exception as exc:
+            cls._log_backend_error("faculty.session.attendance.assignment", exc)
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Could not load the session class roster.") from exc
+        if cls._response_error(assignment_response) or not assignment_response.data:
+            cls._log_backend_error(
+                "faculty.session.attendance.assignment",
+                getattr(assignment_response, "error", None)
+                or getattr(assignment_response, "data", None),
+            )
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Could not load the session class roster.")
+
+        class_id = assignment_response.data.get("class_id")
+        if not class_id:
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, "The session has no assigned class.")
+
+        try:
+            students_response = (
+                admin.from_("students")
+                .select(
+                    "id, roll_number, registration_number, "
+                    "profile:profiles(full_name)"
+                )
+                .eq("class_id", str(class_id))
+                .order("roll_number")
+                .execute()
+            )
+        except Exception as exc:
+            cls._log_backend_error("faculty.session.attendance.roster", exc)
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Could not load the session class roster.") from exc
+        if cls._response_error(students_response):
+            cls._log_backend_error(
+                "faculty.session.attendance.roster",
+                getattr(students_response, "error", None)
+                or getattr(students_response, "data", None),
+            )
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Could not load the session class roster.")
+
         try:
             response = (
                 admin.from_("attendance_records")
@@ -463,8 +508,45 @@ class FacultyService:
             )
             raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Could not load session attendance.")
 
-        results = []
+        records_by_student = {}
         for row in response.data or []:
+            records_by_student[str(row["student_id"])] = row
+
+        results = []
+        roster_student_ids = set()
+        for roster_student in students_response.data or []:
+            student_id = str(roster_student["id"])
+            roster_student_ids.add(student_id)
+            row = records_by_student.get(student_id)
+            record_student = (row or {}).get("student") or {}
+            profile = (
+                record_student.get("profile")
+                if row
+                else roster_student.get("profile")
+            ) or {}
+            results.append(
+                FacultyAttendanceRecordResponse(
+                    id=row["id"] if row else student_id,
+                    session_id=str(session_id),
+                    student_id=student_id,
+                    status=row["status"] if row else "not_marked",
+                    marked_at=row.get("marked_at") if row else None,
+                    full_name=profile.get("full_name"),
+                    roll_number=(
+                        record_student.get("roll_number")
+                        if row
+                        else roster_student.get("roll_number")
+                    ),
+                    registration_number=(
+                        record_student.get("registration_number")
+                        if row
+                        else roster_student.get("registration_number")
+                    ),
+                )
+            )
+        for student_id, row in records_by_student.items():
+            if student_id in roster_student_ids:
+                continue
             student = row.get("student") or {}
             profile = student.get("profile") or {}
             results.append(

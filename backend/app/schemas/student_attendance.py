@@ -34,8 +34,8 @@ class FacultyAttendanceRecordResponse(BaseModel):
     id: UUID
     session_id: UUID
     student_id: UUID
-    status: Literal["present", "late", "absent", "excused"]
-    marked_at: datetime
+    status: Literal["present", "late", "absent", "excused", "not_marked"]
+    marked_at: Optional[datetime] = None
     full_name: Optional[str] = None
     roll_number: Optional[str] = None
     registration_number: Optional[str] = None

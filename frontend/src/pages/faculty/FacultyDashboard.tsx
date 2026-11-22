@@ -397,7 +397,7 @@ const SessionDetails: React.FC<{
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-bold text-slate-800">
-              Persisted attendance ({attendanceRecords.filter((record) => record.status === 'present' || record.status === 'late').length} present)
+              Class attendance ({attendanceRecords.filter((record) => record.status === 'present' || record.status === 'late').length} present)
             </p>
             <button
               type="button"
@@ -430,9 +430,11 @@ const SessionDetails: React.FC<{
                   <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold ${
                     record.status === 'present' || record.status === 'late'
                       ? 'bg-emerald-100 text-emerald-800'
-                      : 'bg-amber-100 text-amber-800'
+                      : record.status === 'not_marked'
+                        ? 'bg-slate-100 text-slate-600'
+                        : 'bg-amber-100 text-amber-800'
                   }`}>
-                    {record.status}
+                    {record.status === 'not_marked' ? 'not marked' : record.status}
                   </span>
                 </li>
               ))}

@@ -49,8 +49,8 @@ export interface AttendanceRecord {
   id: string;
   session_id: string;
   student_id: string;
-  status: 'present' | 'late' | 'absent' | 'excused';
-  marked_at: string;
+  status: 'present' | 'late' | 'absent' | 'excused' | 'not_marked';
+  marked_at: string | null;
   full_name: string | null;
   roll_number: string | null;
   registration_number: string | null;

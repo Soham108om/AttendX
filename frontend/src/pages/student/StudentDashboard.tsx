@@ -933,8 +933,14 @@ const AttendanceHistoryPanel: React.FC = () => {
     const frame = window.requestAnimationFrame(() => {
       void loadHistory();
     });
+    const timer = window.setInterval(() => {
+      void loadHistory();
+    }, 30000);
+    window.addEventListener('focus', loadHistory);
     return () => {
       window.cancelAnimationFrame(frame);
+      window.clearInterval(timer);
+      window.removeEventListener('focus', loadHistory);
       requestRef.current += 1;
     };
   }, [loadHistory]);
