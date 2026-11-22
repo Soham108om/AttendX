@@ -24,6 +24,7 @@ import studentHeroPortrait from '../assets/student-portrait.jpg';
 import portalAdminImg from '../assets/portal-admin.png';
 import portalFacultyImg from '../assets/portal-faculty.png';
 import portalStudentImg from '../assets/portal-student.png';
+import { API_HEALTH_URL } from '../services/apiConfig';
 
 interface BackendHealth {
   status: string;
@@ -36,14 +37,10 @@ export const LandingPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
 
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
-  // Standard root health check
-  const healthEndpoint = apiBaseUrl.replace('/api/v1', '/health');
-
   const checkHealth = async () => {
     setLoading(true);
     try {
-      const res = await fetch(healthEndpoint);
+      const res = await fetch(API_HEALTH_URL);
       if (!res.ok) {
         throw new Error(`HTTP Error: ${res.status}`);
       }

@@ -9,19 +9,13 @@ import type {
   StudentAttendanceHistoryRecord,
   AttendanceVerificationResult,
 } from '../types';
+import { API_BASE_URL, resolveApiBaseUrl } from './apiConfig';
 
 /**
  * Resolves and normalizes the backend API base URL from the environment.
- * Trims whitespace and strips any trailing slashes to prevent malformed endpoint paths.
- * Falls back to 'http://localhost:8000/api/v1' when VITE_API_BASE_URL is not set.
+ * Kept exported here for compatibility with existing consumers.
  */
-export function resolveApiBaseUrl(envUrl?: string): string {
-  const raw = (envUrl !== undefined ? envUrl : import.meta.env.VITE_API_BASE_URL)?.trim();
-  const base = raw || 'http://localhost:8000/api/v1';
-  return base.replace(/\/+$/, '');
-}
-
-export const API_BASE_URL = resolveApiBaseUrl();
+export { API_BASE_URL, resolveApiBaseUrl };
 export const REQUIRED_FACE_SAMPLE_COUNT = 5;
 
 async function getAuthHeaders(includeJson = true): Promise<HeadersInit> {

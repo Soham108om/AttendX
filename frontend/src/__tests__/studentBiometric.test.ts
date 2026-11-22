@@ -147,10 +147,16 @@ describe('Student biometric UI rules', () => {
       );
     });
 
+    it('adds the API version prefix when configured with only the backend origin', () => {
+      expect(resolveApiBaseUrl('https://attendx-backend.onrender.com')).toBe(
+        'https://attendx-backend.onrender.com/api/v1'
+      );
+    });
+
     it('normalizes and removes trailing slashes', () => {
       expect(resolveApiBaseUrl('http://api.example.com/api/v1/')).toBe('http://api.example.com/api/v1');
       expect(resolveApiBaseUrl('http://api.example.com/api/v1///')).toBe('http://api.example.com/api/v1');
-      expect(resolveApiBaseUrl('http://localhost:8000/api/v1/   ')).toBe('http://localhost:8000/api/v1');
+      expect(resolveApiBaseUrl('http://localhost:8000/   ')).toBe('http://localhost:8000/api/v1');
     });
   });
 });
