@@ -31,7 +31,8 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins(self) -> List[str]:
-        origins = [self.FRONTEND_ORIGIN.rstrip("/")]
+        raw_origins = [o.strip().rstrip("/") for o in self.FRONTEND_ORIGIN.split(",") if o.strip()]
+        origins = [o for o in raw_origins if o]
         # Also include standard localhost variants if in development
         if self.APP_ENV == "development":
             origins.extend([

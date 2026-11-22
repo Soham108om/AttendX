@@ -100,6 +100,8 @@ backend/app/ai/weights/*.bin
 *.onnx
 *.weights
 !backend/app/ai/weights/.gitkeep
+!backend/models/face_detection/*.onnx
+!backend/models/face_recognition/*.onnx
 
 # Temporary biometric image uploads & logs
 temp_biometrics/
