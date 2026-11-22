@@ -178,16 +178,16 @@ export const FacultyDashboard: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/70 via-white to-blue-50/50 p-6">
+    <div className="faculty-dashboard space-y-6">
+      <div className="rounded-[24px] border border-[#E8E0D2] bg-[linear-gradient(135deg,#FFFDF8_0%,#F8E6B0_100%)] p-6 shadow-[0_12px_32px_rgba(64,53,31,0.06)]">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-800">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#E8E0D2] bg-[#FFFDF8]/80 px-3 py-1 text-xs font-semibold text-[#292929]">
               <Camera className="h-3.5 w-3.5" />
               Faculty Attendance Portal
             </div>
-            <h2 className="mt-2 text-xl font-bold text-slate-900">
-              Welcome, Prof. {profile?.full_name || 'Faculty Member'}
+            <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[#292929]">
+              Welcome back, Prof. {profile?.full_name || 'Faculty Member'}
             </h2>
             <p className="mt-1 text-xs text-slate-600">
               Manage assigned classes and attendance session lifecycle.

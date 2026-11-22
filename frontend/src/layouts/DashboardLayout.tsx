@@ -23,65 +23,54 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     navigate('/login', { replace: true });
   };
 
-  const getRoleBadgeClasses = (role: UserRole) => {
-    switch (role) {
-      case 'admin':
-        return 'bg-purple-50 text-purple-700 ring-purple-700/20';
-      case 'faculty':
-        return 'bg-indigo-50 text-indigo-700 ring-indigo-700/20';
-      case 'student':
-        return 'bg-blue-50 text-blue-700 ring-blue-700/20';
-    }
+  const roleLabel: Record<UserRole, string> = {
+    admin: 'Admin',
+    faculty: 'Faculty',
+    student: 'Student',
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900">
+    <div className="attendx-dashboard flex min-h-screen flex-col text-[#292929]">
       {/* Top Application Bar */}
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+      <header className="sticky top-0 z-40 px-3 pt-3 sm:px-5">
+        <div className="mx-auto flex max-w-[1440px] items-center justify-between rounded-[22px] border border-[#E8E0D2] bg-[#FFFDF8]/95 px-4 py-3 shadow-[0_12px_32px_rgba(64,53,31,0.08)] backdrop-blur-xl sm:px-5">
           {/* Brand */}
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
-              <ScanFace className="h-6 w-6" />
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#E8E0D2] bg-[#FFFDF8] text-[#292929]">
+              <ScanFace className="h-5 w-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xl font-bold tracking-tight text-slate-900">
-                  Attend<span className="text-blue-600">X</span>
-                </span>
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ring-1 ring-inset ${getRoleBadgeClasses(
-                    roleBadge
-                  )}`}
-                >
-                  {roleBadge}
-                </span>
-              </div>
-              <p className="text-xs text-slate-500">Smart Attendance System</p>
-            </div>
+            <span className="text-lg font-bold tracking-[-0.03em] text-[#292929]">
+              Attend<span className="text-[#C18B24]">X</span>
+            </span>
+          </div>
+
+          <div className="hidden items-center rounded-full border border-[#EEE6D5] bg-[#F8F5ED] p-1 md:flex">
+            <span className="rounded-full bg-[#292929] px-4 py-2 text-xs font-semibold text-white shadow-sm">
+              Dashboard
+            </span>
           </div>
 
           {/* User Profile Summary & Logout */}
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:flex items-center gap-3 border-r border-slate-200 pr-4">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-                <UserCircle className="h-5 w-5" />
+          <div className="flex items-center gap-2">
+            <div className="hidden items-center gap-3 sm:flex">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#E8E0D2] bg-[#F2EEE4] text-[#77736B]">
+                <UserCircle className="h-4.5 w-4.5" />
               </div>
               <div className="text-left">
-                <p className="text-xs font-bold text-slate-900">
+                <p className="text-xs font-bold text-[#292929]">
                   {profile?.full_name || user?.email?.split('@')[0] || 'Authenticated User'}
                 </p>
-                <p className="text-[11px] text-slate-500">{user?.email}</p>
+                <p className="text-[10px] text-[#77736B]">{roleLabel[roleBadge]} account</p>
               </div>
             </div>
 
             <button
               onClick={handleLogout}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 hover:text-red-600 transition-colors"
+              className="inline-flex h-10 items-center gap-1.5 rounded-full border border-[#E8E0D2] bg-[#FFFDF8] px-3 text-xs font-semibold text-[#292929] transition-colors hover:bg-[#F2EEE4]"
               title="Sign out of AttendX"
             >
               <LogOut className="h-3.5 w-3.5" />
-              <span>Sign Out</span>
+              <span className="hidden sm:inline">Sign Out</span>
             </button>
           </div>
         </div>
@@ -89,13 +78,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
       {/* Main Content Viewport */}
       <main className="flex-1">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-8">
           {/* Header Title Section */}
-          <div className="mb-8">
-            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
+          <div className="mb-6">
+            <h1 className="text-[clamp(1.75rem,4vw,3rem)] font-semibold tracking-[-0.045em] text-[#292929]">
               {title}
             </h1>
-            <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+            <p className="mt-1 text-sm text-[#77736B]">{subtitle}</p>
           </div>
 
           <Outlet />
