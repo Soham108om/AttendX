@@ -22,3 +22,6 @@ export interface NavItem {
 }
 
 export * from './admin';
+export * from './provisioning';
+export * from './faculty';
+export * from './biometric';

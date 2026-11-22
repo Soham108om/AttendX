@@ -11,7 +11,12 @@ import {
   RefreshCw, 
   Search, 
   Layers, 
-  AlertCircle 
+  AlertCircle,
+  UserX,
+  CheckCircle2,
+  XCircle,
+  ToggleLeft,
+  ToggleRight
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { 
@@ -27,7 +32,18 @@ import {
   getSubjects, 
   createSubject, 
   updateSubject, 
-  deleteSubject 
+  deleteSubject,
+  getFacultyList,
+  provisionFaculty,
+  updateFaculty,
+  deactivateFaculty,
+  getStudentsList,
+  provisionStudent,
+  updateStudent,
+  deactivateStudent,
+  getAssignmentsList,
+  createAssignment,
+  toggleAssignmentStatus
 } from '../../services/adminService';
 import type { 
   AdminOverviewStats, 
@@ -36,15 +52,28 @@ import type {
   Subject,
   CreateDepartmentInput,
   CreateClassInput,
-  CreateSubjectInput 
+  CreateSubjectInput,
+  FacultyMember,
+  StudentMember,
+  AcademicAssignment,
+  ProvisionFacultyInput,
+  ProvisionStudentInput,
+  UpdateFacultyInput,
+  UpdateStudentInput,
+  CreateAssignmentInput,
+  ProvisionedCredentialData
 } from '../../types';
 import { DepartmentModal } from '../../components/admin/DepartmentModal';
 import { ClassModal } from '../../components/admin/ClassModal';
 import { SubjectModal } from '../../components/admin/SubjectModal';
 import { ConfirmDeleteModal } from '../../components/admin/ConfirmDeleteModal';
+import { ProvisionFacultyModal } from '../../components/admin/ProvisionFacultyModal';
+import { ProvisionStudentModal } from '../../components/admin/ProvisionStudentModal';
+import { AssignmentModal } from '../../components/admin/AssignmentModal';
+import { CredentialSuccessModal } from '../../components/admin/CredentialSuccessModal';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 
-type AdminTab = 'overview' | 'departments' | 'classes' | 'subjects';
+type AdminTab = 'overview' | 'departments' | 'classes' | 'subjects' | 'faculty' | 'students' | 'assignments';
 
 export const AdminDashboard: React.FC = () => {
   const { profile } = useAuth();
@@ -61,11 +90,17 @@ export const AdminDashboard: React.FC = () => {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [classes, setClasses] = useState<AcademicClass[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [faculty, setFaculty] = useState<FacultyMember[]>([]);
+  const [students, setStudents] = useState<StudentMember[]>([]);
+  const [assignments, setAssignments] = useState<AcademicAssignment[]>([]);
 
   // Loading States
   const [isDeptsLoading, setIsDeptsLoading] = useState<boolean>(false);
   const [isClassesLoading, setIsClassesLoading] = useState<boolean>(false);
   const [isSubjectsLoading, setIsSubjectsLoading] = useState<boolean>(false);
+  const [isFacultyLoading, setIsFacultyLoading] = useState<boolean>(false);
+  const [isStudentsLoading, setIsStudentsLoading] = useState<boolean>(false);
+  const [isAssignmentsLoading, setIsAssignmentsLoading] = useState<boolean>(false);
 
   // General Action Feedback / Errors
   const [actionError, setActionError] = useState<string | null>(null);
@@ -73,8 +108,9 @@ export const AdminDashboard: React.FC = () => {
   // Filter & Search
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [deptFilter, setDeptFilter] = useState<string>('all');
+  const [studentClassFilter, setStudentClassFilter] = useState<string>('all');
 
-  // Modal States
+  // Academic Modals
   const [isDeptModalOpen, setIsDeptModalOpen] = useState<boolean>(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
 
@@ -84,7 +120,18 @@ export const AdminDashboard: React.FC = () => {
   const [isSubjectModalOpen, setIsSubjectModalOpen] = useState<boolean>(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
 
-  // Delete Modal State
+  // Provisioning & Assignment Modals
+  const [isProvisionFacultyModalOpen, setIsProvisionFacultyModalOpen] = useState<boolean>(false);
+  const [isProvisionStudentModalOpen, setIsProvisionStudentModalOpen] = useState<boolean>(false);
+  const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState<boolean>(false);
+  const [editingFaculty, setEditingFaculty] = useState<FacultyMember | null>(null);
+  const [editingStudent, setEditingStudent] = useState<StudentMember | null>(null);
+
+  // Credential Success Modal
+  const [credentialModalData, setCredentialModalData] = useState<ProvisionedCredentialData | null>(null);
+  const [isCredentialModalOpen, setIsCredentialModalOpen] = useState<boolean>(false);
+
+  // Delete / Deactivate Confirm Modal State
   const [deleteModalState, setDeleteModalState] = useState<{
     isOpen: boolean;
     title: string;
@@ -148,13 +195,60 @@ export const AdminDashboard: React.FC = () => {
     setIsSubjectsLoading(false);
   }, []);
 
+  // Fetch Faculty List
+  const fetchFaculty = useCallback(async () => {
+    setIsFacultyLoading(true);
+    const { data, error } = await getFacultyList();
+    if (error) {
+      setActionError(error);
+    } else {
+      setFaculty(data || []);
+    }
+    setIsFacultyLoading(false);
+  }, []);
+
+  // Fetch Students List
+  const fetchStudents = useCallback(async () => {
+    setIsStudentsLoading(true);
+    const { data, error } = await getStudentsList();
+    if (error) {
+      setActionError(error);
+    } else {
+      setStudents(data || []);
+    }
+    setIsStudentsLoading(false);
+  }, []);
+
+  // Fetch Assignments List
+  const fetchAssignments = useCallback(async () => {
+    setIsAssignmentsLoading(true);
+    const { data, error } = await getAssignmentsList();
+    if (error) {
+      setActionError(error);
+    } else {
+      setAssignments(data || []);
+    }
+    setIsAssignmentsLoading(false);
+  }, []);
+
   // Initial Data Load
   useEffect(() => {
     fetchStats();
     fetchDepartments();
     fetchClasses();
     fetchSubjects();
-  }, [fetchStats, fetchDepartments, fetchClasses, fetchSubjects]);
+    fetchFaculty();
+    fetchStudents();
+    fetchAssignments();
+  }, [
+    fetchStats,
+    fetchDepartments,
+    fetchClasses,
+    fetchSubjects,
+    fetchFaculty,
+    fetchStudents,
+    fetchAssignments,
+  ]);
 
   // Handlers for Department CRUD
   const handleSaveDepartment = async (input: CreateDepartmentInput) => {
@@ -255,6 +349,112 @@ export const AdminDashboard: React.FC = () => {
     });
   };
 
+  // Handlers for Faculty Provisioning & Deactivation
+  const handleSaveFaculty = async (input: ProvisionFacultyInput | UpdateFacultyInput) => {
+    setActionError(null);
+    if (editingFaculty) {
+      const res = await updateFaculty(editingFaculty.id, input as UpdateFacultyInput);
+      if (!res.success) return res;
+      await fetchFaculty();
+      setEditingFaculty(null);
+      return { success: true };
+    }
+
+    const res = await provisionFaculty(input as ProvisionFacultyInput);
+    if (res.error) {
+      return { success: false, error: res.error };
+    }
+    if (res.data) {
+      setCredentialModalData(res.data);
+      setIsCredentialModalOpen(true);
+    }
+    fetchFaculty();
+    fetchStats();
+    return { success: true };
+  };
+
+  const promptDeactivateFaculty = (f: FacultyMember) => {
+    const displayName = f.full_name || f.faculty_id_number;
+    setDeleteModalState({
+      isOpen: true,
+      title: 'Deactivate Faculty Member',
+      itemName: `${displayName} (${f.faculty_id_number})`,
+      itemType: 'faculty account',
+      onConfirm: async () => {
+        const res = await deactivateFaculty(f.id);
+        if (res.success) {
+          fetchFaculty();
+          fetchAssignments();
+          fetchStats();
+        }
+        return res;
+      },
+    });
+  };
+
+  // Handlers for Student Provisioning & Deactivation
+  const handleSaveStudent = async (input: ProvisionStudentInput | UpdateStudentInput) => {
+    setActionError(null);
+    if (editingStudent) {
+      const res = await updateStudent(editingStudent.id, input as UpdateStudentInput);
+      if (!res.success) return res;
+      await fetchStudents();
+      setEditingStudent(null);
+      return { success: true };
+    }
+
+    const res = await provisionStudent(input as ProvisionStudentInput);
+    if (res.error) return { success: false, error: res.error };
+    if (res.data) {
+      setCredentialModalData(res.data);
+      setIsCredentialModalOpen(true);
+    }
+    fetchStudents();
+    fetchStats();
+    return { success: true };
+  };
+
+  const promptDeactivateStudent = (s: StudentMember) => {
+    const displayName = s.full_name || s.roll_number;
+    setDeleteModalState({
+      isOpen: true,
+      title: 'Deactivate Student Account',
+      itemName: `${displayName} (Roll: ${s.roll_number})`,
+      itemType: 'student account',
+      onConfirm: async () => {
+        const res = await deactivateStudent(s.id);
+        if (res.success) {
+          fetchStudents();
+          fetchStats();
+        }
+        return res;
+      },
+    });
+  };
+
+  // Handlers for Course Assignments
+  const handleSaveAssignment = async (input: CreateAssignmentInput) => {
+    setActionError(null);
+    const res = await createAssignment(input);
+    if (!res.success) {
+      return { success: false, error: res.error };
+    }
+    fetchAssignments();
+    return { success: true };
+  };
+
+  const handleToggleAssignment = async (assignmentId: string, currentStatus: boolean) => {
+    setActionError(null);
+    const res = await toggleAssignmentStatus(assignmentId);
+    if (!res.success) {
+      setActionError(res.error || 'Failed to update assignment status.');
+      return;
+    }
+    setAssignments((prev) =>
+      prev.map((a) => (a.id === assignmentId ? { ...a, is_active: !currentStatus } : a))
+    );
+  };
+
   // Filtered Lists
   const filteredDepartments = departments.filter(
     (d) =>
@@ -278,6 +478,32 @@ export const AdminDashboard: React.FC = () => {
     return matchesSearch && matchesDept;
   });
 
+  const filteredFaculty = faculty.filter((f) => {
+    const nameMatch = f.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false;
+    const emailMatch = f.email?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false;
+    const idMatch = f.faculty_id_number.toLowerCase().includes(searchQuery.toLowerCase());
+    const deptMatch = deptFilter === 'all' || f.department_id === deptFilter;
+    return (nameMatch || emailMatch || idMatch) && deptMatch;
+  });
+
+  const filteredStudents = students.filter((s) => {
+    const nameMatch = s.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false;
+    const emailMatch = s.email?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false;
+    const rollMatch = s.roll_number.toLowerCase().includes(searchQuery.toLowerCase());
+    const regMatch = s.registration_number.toLowerCase().includes(searchQuery.toLowerCase());
+    const classMatch = studentClassFilter === 'all' || s.class_id === studentClassFilter;
+    return (nameMatch || emailMatch || rollMatch || regMatch) && classMatch;
+  });
+
+  const filteredAssignments = assignments.filter((a) => {
+    const facultyName = a.faculty_name?.toLowerCase() ?? '';
+    const subjectCode = a.subject_code?.toLowerCase() ?? '';
+    const subjectName = a.subject_name?.toLowerCase() ?? '';
+    const className = a.class_name?.toLowerCase() ?? '';
+    const q = searchQuery.toLowerCase();
+    return facultyName.includes(q) || subjectCode.includes(q) || subjectName.includes(q) || className.includes(q);
+  });
+
   return (
     <div className="space-y-6">
       {/* 1. Header & Welcome Card */}
@@ -292,7 +518,7 @@ export const AdminDashboard: React.FC = () => {
               Academic Control Hub — {profile?.full_name || 'Administrator'}
             </h2>
             <p className="mt-1 text-xs text-slate-600">
-              Manage departments, classes, subjects, and view live database metrics.
+              Manage departments, classes, subjects, faculty, students, and course assignments.
             </p>
           </div>
           <button
@@ -301,6 +527,9 @@ export const AdminDashboard: React.FC = () => {
               fetchDepartments();
               fetchClasses();
               fetchSubjects();
+              fetchFaculty();
+              fetchStudents();
+              fetchAssignments();
             }}
             disabled={isStatsLoading}
             className="inline-flex items-center gap-2 text-xs text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 px-3.5 py-2 rounded-xl shadow-xs transition-colors self-start sm:self-auto"
@@ -416,26 +645,26 @@ export const AdminDashboard: React.FC = () => {
 
       {/* 3. Segmented Navigation Tabs */}
       <div className="border-b border-slate-200">
-        <nav className="flex space-x-6">
+        <nav className="flex space-x-6 overflow-x-auto">
           <button
             onClick={() => {
               setActiveTab('overview');
               setSearchQuery('');
             }}
-            className={`pb-3 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 ${
+            className={`pb-3 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 whitespace-nowrap ${
               activeTab === 'overview'
                 ? 'border-purple-600 text-purple-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            Overview & Quick Actions
+            Overview & Actions
           </button>
           <button
             onClick={() => {
               setActiveTab('departments');
               setSearchQuery('');
             }}
-            className={`pb-3 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 ${
+            className={`pb-3 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 whitespace-nowrap ${
               activeTab === 'departments'
                 ? 'border-purple-600 text-purple-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -448,26 +677,65 @@ export const AdminDashboard: React.FC = () => {
               setActiveTab('classes');
               setSearchQuery('');
             }}
-            className={`pb-3 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 ${
+            className={`pb-3 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 whitespace-nowrap ${
               activeTab === 'classes'
                 ? 'border-purple-600 text-purple-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            Classes & Sections ({classes.length})
+            Classes ({classes.length})
           </button>
           <button
             onClick={() => {
               setActiveTab('subjects');
               setSearchQuery('');
             }}
-            className={`pb-3 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 ${
+            className={`pb-3 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 whitespace-nowrap ${
               activeTab === 'subjects'
                 ? 'border-purple-600 text-purple-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            Subjects & Credits ({subjects.length})
+            Subjects ({subjects.length})
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('faculty');
+              setSearchQuery('');
+            }}
+            className={`pb-3 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 whitespace-nowrap ${
+              activeTab === 'faculty'
+                ? 'border-purple-600 text-purple-700'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Faculty ({faculty.length})
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('students');
+              setSearchQuery('');
+            }}
+            className={`pb-3 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 whitespace-nowrap ${
+              activeTab === 'students'
+                ? 'border-purple-600 text-purple-700'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Students ({students.length})
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('assignments');
+              setSearchQuery('');
+            }}
+            className={`pb-3 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 whitespace-nowrap ${
+              activeTab === 'assignments'
+                ? 'border-purple-600 text-purple-700'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Assignments ({assignments.length})
           </button>
         </nav>
       </div>
@@ -475,16 +743,107 @@ export const AdminDashboard: React.FC = () => {
       {/* 4. Tab 1: Overview & Quick Actions */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-            {/* Departments Card */}
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {/* Faculty Provisioning Card */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
+                  <Users className="h-5 w-5" />
+                </div>
+                <span className="text-xs font-bold text-slate-400">{faculty.length} Active</span>
+              </div>
+              <h4 className="mt-4 text-base font-bold text-slate-900">Faculty Provisioning</h4>
+              <p className="mt-1 text-xs text-slate-500 leading-relaxed">
+                Create faculty profiles, generate secure credentials, and allocate academic roles.
+              </p>
+              <div className="mt-5 flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setEditingFaculty(null);
+                    setIsProvisionFacultyModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Provision Faculty</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('faculty')}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  Manage Roster
+                </button>
+              </div>
+            </div>
+
+            {/* Students Provisioning Card */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+                  <GraduationCap className="h-5 w-5" />
+                </div>
+                <span className="text-xs font-bold text-slate-400">{students.length} Enrolled</span>
+              </div>
+              <h4 className="mt-4 text-base font-bold text-slate-900">Student Enrollment</h4>
+              <p className="mt-1 text-xs text-slate-500 leading-relaxed">
+                Provision student accounts, assign roll numbers, cohorts, and check face enrollment status.
+              </p>
+              <div className="mt-5 flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setEditingStudent(null);
+                    setIsProvisionStudentModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Provision Student</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('students')}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  View Students
+                </button>
+              </div>
+            </div>
+
+            {/* Course Allocations Card */}
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 text-purple-700">
+                  <BookOpen className="h-5 w-5" />
+                </div>
+                <span className="text-xs font-bold text-slate-400">{assignments.length} Assigned</span>
+              </div>
+              <h4 className="mt-4 text-base font-bold text-slate-900">Course Allocations</h4>
+              <p className="mt-1 text-xs text-slate-500 leading-relaxed">
+                Map faculty to curriculum subjects and class cohorts for automated session tracking.
+              </p>
+              <div className="mt-5 flex items-center gap-2">
+                <button
+                  onClick={() => setIsAssignmentModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-purple-700 transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Assign Course</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('assignments')}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  View All
+                </button>
+              </div>
+            </div>
+
+            {/* Departments Card */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
                   <Building2 className="h-5 w-5" />
                 </div>
-                <span className="text-xs font-bold text-slate-400">
-                  {departments.length} Listed
-                </span>
+                <span className="text-xs font-bold text-slate-400">{departments.length} Listed</span>
               </div>
               <h4 className="mt-4 text-base font-bold text-slate-900">Department Management</h4>
               <p className="mt-1 text-xs text-slate-500 leading-relaxed">
@@ -496,7 +855,7 @@ export const AdminDashboard: React.FC = () => {
                     setEditingDept(null);
                     setIsDeptModalOpen(true);
                   }}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-purple-700 transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-slate-900 transition-colors"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   <span>Add Department</span>
@@ -518,15 +877,15 @@ export const AdminDashboard: React.FC = () => {
                 </div>
                 <span className="text-xs font-bold text-slate-400">{classes.length} Listed</span>
               </div>
-              <h4 className="mt-4 text-base font-bold text-slate-900">Class & Section Rosters</h4>
+              <h4 className="mt-4 text-base font-bold text-slate-900">Classes & Sections</h4>
               <p className="mt-1 text-xs text-slate-500 leading-relaxed">
-                Configure student cohorts, semester levels, and academic year assignments.
+                Structure cohorts by department, academic year and semester terms.
               </p>
               <div className="mt-5 flex items-center gap-2">
                 <button
                   onClick={() => {
                     if (departments.length === 0) {
-                      setActionError('Create at least one Department before creating a Class.');
+                      setActionError('Create at least one Department before adding a Class.');
                       return;
                     }
                     setEditingClass(null);
@@ -556,7 +915,7 @@ export const AdminDashboard: React.FC = () => {
               </div>
               <h4 className="mt-4 text-base font-bold text-slate-900">Curriculum Subjects</h4>
               <p className="mt-1 text-xs text-slate-500 leading-relaxed">
-                Define subject codes, course credit weights, and offering department links.
+                Define courses, departmental catalog codes and academic credit values.
               </p>
               <div className="mt-5 flex items-center gap-2">
                 <button
@@ -585,12 +944,12 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* 5. Tab 2: Department Management */}
+      {/* 5. Tab 2: Departments */}
       {activeTab === 'departments' && (
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <input
                 type="text"
                 placeholder="Search departments by code or name..."
@@ -635,12 +994,8 @@ export const AdminDashboard: React.FC = () => {
                   <tbody className="divide-y divide-slate-100">
                     {filteredDepartments.map((dept) => (
                       <tr key={dept.id} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="px-6 py-3.5 font-mono font-bold text-purple-700">
-                          {dept.code}
-                        </td>
-                        <td className="px-6 py-3.5 font-medium text-slate-900">
-                          {dept.name}
-                        </td>
+                        <td className="px-6 py-3.5 font-mono font-bold text-purple-700">{dept.code}</td>
+                        <td className="px-6 py-3.5 font-medium text-slate-900">{dept.name}</td>
                         <td className="px-6 py-3.5 text-right">
                           <div className="inline-flex items-center gap-1">
                             <button
@@ -672,13 +1027,13 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* 6. Tab 3: Class Management */}
+      {/* 6. Tab 3: Classes */}
       {activeTab === 'classes' && (
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex items-center gap-3 flex-1 max-w-lg">
+            <div className="flex flex-1 flex-col sm:flex-row gap-2 max-w-xl">
               <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                 <input
                   type="text"
                   placeholder="Search classes by name or year..."
@@ -724,7 +1079,7 @@ export const AdminDashboard: React.FC = () => {
                 <Layers className="mx-auto h-10 w-10 text-slate-300" />
                 <p className="mt-3 text-sm font-bold text-slate-700">No classes found</p>
                 <p className="mt-1 text-xs text-slate-400">
-                  {searchQuery ? 'No classes match your search query.' : 'Get started by creating your first class/section.'}
+                  {searchQuery ? 'No classes match your search.' : 'Get started by creating your first academic class.'}
                 </p>
               </div>
             ) : (
@@ -748,12 +1103,8 @@ export const AdminDashboard: React.FC = () => {
                             {cls.department?.code || 'N/A'}
                           </span>
                         </td>
-                        <td className="px-6 py-3.5 font-mono text-slate-600">{cls.academic_year}</td>
-                        <td className="px-6 py-3.5">
-                          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
-                            Sem {cls.semester}
-                          </span>
-                        </td>
+                        <td className="px-6 py-3.5 text-slate-600">{cls.academic_year}</td>
+                        <td className="px-6 py-3.5 text-slate-600">Semester {cls.semester}</td>
                         <td className="px-6 py-3.5 text-right">
                           <div className="inline-flex items-center gap-1">
                             <button
@@ -785,13 +1136,13 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* 7. Tab 4: Subject Management */}
+      {/* 7. Tab 4: Subjects */}
       {activeTab === 'subjects' && (
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex items-center gap-3 flex-1 max-w-lg">
+            <div className="flex flex-1 flex-col sm:flex-row gap-2 max-w-xl">
               <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                 <input
                   type="text"
                   placeholder="Search subjects by code or name..."
@@ -896,6 +1247,375 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* 8. Tab 5: Faculty */}
+      {activeTab === 'faculty' && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex flex-1 flex-col sm:flex-row gap-2 max-w-xl">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search faculty by name, email, or faculty ID..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-xl border border-slate-300 bg-white py-2 pl-9 pr-3 text-xs text-slate-900 placeholder-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+                />
+              </div>
+              <select
+                value={deptFilter}
+                onChange={(e) => setDeptFilter(e.target.value)}
+                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 focus:border-indigo-600 focus:outline-none"
+              >
+                <option value="all">All Departments</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.code}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={() => {
+                if (departments.length === 0) {
+                  setActionError('Create at least one Department before provisioning Faculty.');
+                  return;
+                }
+                setEditingFaculty(null);
+                setIsProvisionFacultyModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors self-start sm:self-auto"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Provision Faculty</span>
+            </button>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+            {isFacultyLoading ? (
+              <LoadingSpinner size="md" message="Loading teaching faculty..." />
+            ) : filteredFaculty.length === 0 ? (
+              <div className="p-12 text-center text-slate-500">
+                <Users className="mx-auto h-10 w-10 text-slate-300" />
+                <p className="mt-3 text-sm font-bold text-slate-700">No faculty members found</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  {searchQuery ? 'No faculty members match your filter.' : 'Provision your first faculty account to begin course allocations.'}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    <tr>
+                      <th className="px-6 py-3">Faculty Member</th>
+                      <th className="px-6 py-3">Faculty ID</th>
+                      <th className="px-6 py-3">Department</th>
+                      <th className="px-6 py-3">Designation</th>
+                      <th className="px-6 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredFaculty.map((f) => (
+                      <tr key={f.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="px-6 py-3.5">
+                          <div className="font-semibold text-slate-900">{f.full_name || 'Faculty Member'}</div>
+                          <div className="text-[11px] text-slate-500 font-mono">{f.email || 'No email'}</div>
+                        </td>
+                        <td className="px-6 py-3.5 font-mono font-bold text-indigo-700">{f.faculty_id_number}</td>
+                        <td className="px-6 py-3.5">
+                          <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-600/20">
+                            {f.department_code || 'N/A'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-3.5 font-medium text-slate-700">{f.designation}</td>
+                        <td className="px-6 py-3.5 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {f.account_status === 'inactive' || f.is_active === false ? (
+                              <span className="mr-2 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">Deactivated</span>
+                            ) : f.account_status === 'unknown' || f.is_active == null ? (
+                              <span className="mr-2 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Status unknown</span>
+                            ) : (
+                              <span className="mr-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Active</span>
+                            )}
+                            <button
+                              onClick={() => {
+                                setEditingFaculty(f);
+                                setIsProvisionFacultyModalOpen(true);
+                              }}
+                              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-indigo-600"
+                              title="Edit Faculty"
+                            >
+                              <Edit3 className="h-4 w-4" />
+                            </button>
+                            {f.account_status === 'active' && f.is_active !== false && (
+                              <button
+                                onClick={() => promptDeactivateFaculty(f)}
+                                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors"
+                                title="Deactivate Faculty Account"
+                              >
+                                <UserX className="h-4 w-4" />
+                                <span className="text-[11px] font-semibold">Deactivate</span>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 9. Tab 6: Students */}
+      {activeTab === 'students' && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex flex-1 flex-col sm:flex-row gap-2 max-w-xl">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search students by roll, reg no, name, or email..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-xl border border-slate-300 bg-white py-2 pl-9 pr-3 text-xs text-slate-900 placeholder-slate-400 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/20"
+                />
+              </div>
+              <select
+                value={studentClassFilter}
+                onChange={(e) => setStudentClassFilter(e.target.value)}
+                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 focus:border-blue-600 focus:outline-none"
+              >
+                <option value="all">All Classes</option>
+                {classes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={() => {
+                if (classes.length === 0) {
+                  setActionError('Create at least one Academic Class before provisioning Students.');
+                  return;
+                }
+                setEditingStudent(null);
+                setIsProvisionStudentModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors self-start sm:self-auto"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Provision Student</span>
+            </button>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+            {isStudentsLoading ? (
+              <LoadingSpinner size="md" message="Loading enrolled students..." />
+            ) : filteredStudents.length === 0 ? (
+              <div className="p-12 text-center text-slate-500">
+                <GraduationCap className="mx-auto h-10 w-10 text-slate-300" />
+                <p className="mt-3 text-sm font-bold text-slate-700">No students found</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  {searchQuery ? 'No students match your filter.' : 'Provision your first student to begin attendance tracking.'}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    <tr>
+                      <th className="px-6 py-3">Roll Number</th>
+                      <th className="px-6 py-3">Student Name</th>
+                      <th className="px-6 py-3">Class Cohort</th>
+                      <th className="px-6 py-3">Registration No</th>
+                      <th className="px-6 py-3">Face Enrolled</th>
+                      <th className="px-6 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredStudents.map((s) => (
+                      <tr key={s.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="px-6 py-3.5 font-mono font-bold text-blue-700">{s.roll_number}</td>
+                        <td className="px-6 py-3.5">
+                          <div className="font-semibold text-slate-900">{s.full_name || 'Student'}</div>
+                          <div className="text-[11px] text-slate-500 font-mono">{s.email || 'No email'}</div>
+                        </td>
+                        <td className="px-6 py-3.5">
+                          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-800">
+                            {s.class_name || 'Unassigned'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-3.5 font-mono text-slate-600">{s.registration_number}</td>
+                        <td className="px-6 py-3.5">
+                          {s.face_enrolled ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-200">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Enrolled
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                              <XCircle className="h-3 w-3" />
+                              Pending
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-3.5 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {s.account_status === 'inactive' || s.is_active === false ? (
+                              <span className="mr-2 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">Deactivated</span>
+                            ) : s.account_status === 'unknown' || s.is_active == null ? (
+                              <span className="mr-2 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Status unknown</span>
+                            ) : (
+                              <span className="mr-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Active</span>
+                            )}
+                            <button
+                              onClick={() => {
+                                setEditingStudent(s);
+                                setIsProvisionStudentModalOpen(true);
+                              }}
+                              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-blue-600"
+                              title="Edit Student"
+                            >
+                              <Edit3 className="h-4 w-4" />
+                            </button>
+                            {s.account_status === 'active' && s.is_active !== false && (
+                              <button
+                                onClick={() => promptDeactivateStudent(s)}
+                                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors"
+                                title="Deactivate Student Account"
+                              >
+                                <UserX className="h-4 w-4" />
+                                <span className="text-[11px] font-semibold">Deactivate</span>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 10. Tab 7: Assignments */}
+      {activeTab === 'assignments' && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search allocations by faculty, subject, or class..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 bg-white py-2 pl-9 pr-3 text-xs text-slate-900 placeholder-slate-400 focus:border-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-600/20"
+              />
+            </div>
+            <button
+              onClick={() => {
+                if (faculty.length === 0 || subjects.length === 0 || classes.length === 0) {
+                  setActionError('You must have at least one Faculty, one Subject, and one Class to create an assignment.');
+                  return;
+                }
+                setIsAssignmentModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-purple-700 transition-colors self-start sm:self-auto"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Assign Course</span>
+            </button>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+            {isAssignmentsLoading ? (
+              <LoadingSpinner size="md" message="Loading course allocations..." />
+            ) : filteredAssignments.length === 0 ? (
+              <div className="p-12 text-center text-slate-500">
+                <BookOpen className="mx-auto h-10 w-10 text-slate-300" />
+                <p className="mt-3 text-sm font-bold text-slate-700">No course allocations found</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  {searchQuery ? 'No allocations match your filter.' : 'Allocate faculty members to classes and subjects to enable attendance sessions.'}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    <tr>
+                      <th className="px-6 py-3">Faculty Member</th>
+                      <th className="px-6 py-3">Subject / Course</th>
+                      <th className="px-6 py-3">Class Cohort</th>
+                      <th className="px-6 py-3">Status</th>
+                      <th className="px-6 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredAssignments.map((a) => (
+                      <tr key={a.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="px-6 py-3.5">
+                          <div className="font-semibold text-slate-900">{a.faculty_name || 'Faculty Member'}</div>
+                          <div className="text-[11px] text-slate-500 font-mono">{a.faculty_id_number}</div>
+                        </td>
+                        <td className="px-6 py-3.5">
+                          <div className="font-bold text-purple-700">[{a.subject_code}] {a.subject_name}</div>
+                        </td>
+                        <td className="px-6 py-3.5">
+                          <div className="font-medium text-slate-800">{a.class_name}</div>
+                        </td>
+                        <td className="px-6 py-3.5">
+                          {a.is_active ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-200">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Active
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                              <XCircle className="h-3 w-3" />
+                              Inactive
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-3.5 text-right">
+                          <button
+                            onClick={() => handleToggleAssignment(a.id, a.is_active)}
+                            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors ${
+                              a.is_active
+                                ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                            }`}
+                            title={a.is_active ? 'Deactivate Allocation' : 'Activate Allocation'}
+                          >
+                            {a.is_active ? (
+                              <>
+                                <ToggleRight className="h-4 w-4 text-emerald-600" />
+                                <span>Deactivate</span>
+                              </>
+                            ) : (
+                              <>
+                                <ToggleLeft className="h-4 w-4 text-slate-400" />
+                                <span>Activate</span>
+                              </>
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Modals */}
       <DepartmentModal
         isOpen={isDeptModalOpen}
@@ -918,6 +1638,46 @@ export const AdminDashboard: React.FC = () => {
         onSave={handleSaveSubject}
         departments={departments}
         subject={editingSubject}
+      />
+
+      <ProvisionFacultyModal
+        isOpen={isProvisionFacultyModalOpen}
+        onClose={() => {
+          setIsProvisionFacultyModalOpen(false);
+          setEditingFaculty(null);
+        }}
+        onSave={handleSaveFaculty}
+        departments={departments}
+        faculty={editingFaculty}
+      />
+
+      <ProvisionStudentModal
+        isOpen={isProvisionStudentModalOpen}
+        onClose={() => {
+          setIsProvisionStudentModalOpen(false);
+          setEditingStudent(null);
+        }}
+        onSave={handleSaveStudent}
+        classes={classes}
+        student={editingStudent}
+      />
+
+      <AssignmentModal
+        isOpen={isAssignmentModalOpen}
+        onClose={() => setIsAssignmentModalOpen(false)}
+        onSave={handleSaveAssignment}
+        faculty={faculty}
+        subjects={subjects}
+        classes={classes}
+      />
+
+      <CredentialSuccessModal
+        isOpen={isCredentialModalOpen}
+        onClose={() => {
+          setIsCredentialModalOpen(false);
+          setCredentialModalData(null);
+        }}
+        data={credentialModalData}
       />
 
       <ConfirmDeleteModal

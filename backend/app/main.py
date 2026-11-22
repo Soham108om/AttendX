@@ -29,7 +29,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         status_code=500,
         content={
             "error": "InternalServerError",
-            "message": str(exc) if settings.APP_ENV == "development" else "An unexpected error occurred.",
+            "message": "An unexpected error occurred.",
         },
     )
 

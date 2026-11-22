@@ -36,3 +36,20 @@ def get_supabase_admin_client() -> Optional[Client]:
                 supabase_key=settings.SUPABASE_SERVICE_ROLE_KEY,
             )
     return _supabase_admin_client
+
+
+def get_supabase_user_client(access_token: str) -> Optional[Client]:
+    """
+    Creates a short-lived anon Supabase client scoped to a verified user access token.
+    Used for RPCs that must derive auth.uid() and preserve the caller's database ownership.
+    """
+    if not access_token:
+        return None
+    if not settings.SUPABASE_URL or not settings.SUPABASE_ANON_KEY:
+        return None
+    client = create_client(
+        supabase_url=settings.SUPABASE_URL,
+        supabase_key=settings.SUPABASE_ANON_KEY,
+    )
+    client.postgrest.auth(access_token)
+    return client

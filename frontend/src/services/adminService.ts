@@ -10,14 +10,23 @@ import type {
   CreateSubjectInput,
   UpdateSubjectInput,
   AdminOverviewStats,
+  FacultyMember,
+  StudentMember,
+  AcademicAssignment,
+  ProvisionFacultyInput,
+  ProvisionStudentInput,
+  CreateAssignmentInput,
+  ProvisionedCredentialData,
 } from '../types';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
 /**
  * Normalizes PostgreSQL errors into user-friendly messages.
  */
 function parseDatabaseError(error: { code?: string; message: string; details?: string }): string {
   if (error.code === '23505') {
-    return 'A record with these unique details (code, name, or semester allocation) already exists in the database.';
+    return 'A record with these unique details (code, roll number, registration number, or email) already exists in the database.';
   }
   if (error.code === '23503') {
     return 'This record cannot be removed because it is referenced by other academic entities (classes, subjects, faculty, or attendance records).';
@@ -26,6 +35,18 @@ function parseDatabaseError(error: { code?: string; message: string; details?: s
     return 'Access Denied: Only administrators with valid credentials can perform this action under database RLS policies.';
   }
   return error.message || 'An unexpected database error occurred.';
+}
+
+/**
+ * Retrieves valid Supabase access token for FastAPI backend communication.
+ */
+async function getAuthHeaders(): Promise<HeadersInit> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token || '';
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  };
 }
 
 /**
@@ -165,7 +186,6 @@ export async function deleteDepartment(
   if (!isSupabaseConfigured) return { success: false, error: 'Supabase not configured.' };
 
   try {
-    // Safety check: ensure department is not currently referenced
     const [classesCheck, subjectsCheck] = await Promise.all([
       supabase.from('classes').select('id', { count: 'exact', head: true }).eq('department_id', id),
       supabase.from('subjects').select('id', { count: 'exact', head: true }).eq('department_id', id),
@@ -297,7 +317,6 @@ export async function deleteClass(
   if (!isSupabaseConfigured) return { success: false, error: 'Supabase not configured.' };
 
   try {
-    // Safety check: verify no enrolled students or faculty assignments
     const { count: studentCount } = await supabase
       .from('students')
       .select('id', { count: 'exact', head: true })
@@ -422,7 +441,6 @@ export async function deleteSubject(
   if (!isSupabaseConfigured) return { success: false, error: 'Supabase not configured.' };
 
   try {
-    // Safety check: verify no active faculty assignments or sessions reference this subject
     const { count: assignmentCount } = await supabase
       .from('faculty_subject_assignments')
       .select('id', { count: 'exact', head: true })
@@ -441,5 +459,285 @@ export async function deleteSubject(
     return { success: true, error: null };
   } catch (err: unknown) {
     return { success: false, error: parseDatabaseError(err as { code?: string; message: string }) };
+  }
+}
+
+/* =============================================================================
+   FACULTY PROVISIONING & MANAGEMENT (FASTAPI BACKEND + SUPABASE)
+============================================================================= */
+
+export async function getFacultyList(): Promise<{
+  data: FacultyMember[] | null;
+  error: string | null;
+}> {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/admin/faculty`, { headers });
+    const body = await response.json();
+    if (!response.ok) {
+      return { data: null, error: body.detail || 'Failed to load faculty.' };
+    }
+    return { data: body as FacultyMember[], error: null };
+  } catch (err: unknown) {
+    return { data: null, error: parseDatabaseError(err as { code?: string; message: string }) };
+  }
+}
+
+export async function provisionFaculty(
+  input: ProvisionFacultyInput
+): Promise<{ data: ProvisionedCredentialData | null; error: string | null }> {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${API_BASE_URL}/admin/provision/faculty`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(input),
+    });
+
+    const body = await res.json();
+    if (!res.ok) {
+      return { data: null, error: body.detail || 'Failed to provision faculty account.' };
+    }
+
+    return {
+      data: {
+        userId: body.user_id,
+        email: body.email,
+        fullName: body.full_name,
+        role: 'faculty',
+        initialPassword: body.initial_password,
+        idCode: body.details?.faculty_id_number || input.faculty_id_number,
+      },
+      error: null,
+    };
+  } catch (err: unknown) {
+    return {
+      data: null,
+      error: err instanceof Error ? err.message : 'Backend connection failed during provisioning.',
+    };
+  }
+}
+
+export async function updateFaculty(
+  facultyId: string,
+  input: { full_name?: string; faculty_id_number?: string; designation?: string; department_id?: string }
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${API_BASE_URL}/admin/faculty/${facultyId}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(input),
+    });
+
+    const body = await res.json();
+    if (!res.ok) {
+      return { success: false, error: body.detail || 'Failed to update faculty.' };
+    }
+    return { success: true, error: null };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Operation failed.' };
+  }
+}
+
+export async function deactivateFaculty(
+  facultyId: string
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${API_BASE_URL}/admin/faculty/${facultyId}/deactivate`, {
+      method: 'POST',
+      headers,
+    });
+
+    const body = await res.json();
+    if (!res.ok) {
+      return { success: false, error: body.detail || 'Failed to deactivate faculty.' };
+    }
+    return { success: true, error: null };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Operation failed.' };
+  }
+}
+
+/* =============================================================================
+   STUDENT PROVISIONING & MANAGEMENT (FASTAPI BACKEND + SUPABASE)
+============================================================================= */
+
+export async function getStudentsList(
+  classId?: string
+): Promise<{ data: StudentMember[] | null; error: string | null }> {
+  try {
+    const headers = await getAuthHeaders();
+    const query = classId ? `?class_id=${encodeURIComponent(classId)}` : '';
+    const response = await fetch(`${API_BASE_URL}/admin/students${query}`, { headers });
+    const body = await response.json();
+    if (!response.ok) {
+      return { data: null, error: body.detail || 'Failed to load students.' };
+    }
+    return { data: body as StudentMember[], error: null };
+  } catch (err: unknown) {
+    return { data: null, error: parseDatabaseError(err as { code?: string; message: string }) };
+  }
+}
+
+export async function provisionStudent(
+  input: ProvisionStudentInput
+): Promise<{ data: ProvisionedCredentialData | null; error: string | null }> {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${API_BASE_URL}/admin/provision/student`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(input),
+    });
+
+    const body = await res.json();
+    if (!res.ok) {
+      return { data: null, error: body.detail || 'Failed to provision student account.' };
+    }
+
+    return {
+      data: {
+        userId: body.user_id,
+        email: body.email,
+        fullName: body.full_name,
+        role: 'student',
+        initialPassword: body.initial_password,
+        idCode: body.details?.roll_number || input.roll_number,
+      },
+      error: null,
+    };
+  } catch (err: unknown) {
+    return {
+      data: null,
+      error: err instanceof Error ? err.message : 'Backend connection failed during provisioning.',
+    };
+  }
+}
+
+export async function updateStudent(
+  studentId: string,
+  input: { full_name?: string; registration_number?: string; roll_number?: string; class_id?: string }
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${API_BASE_URL}/admin/students/${studentId}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(input),
+    });
+
+    const body = await res.json();
+    if (!res.ok) {
+      return { success: false, error: body.detail || 'Failed to update student.' };
+    }
+    return { success: true, error: null };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Operation failed.' };
+  }
+}
+
+export async function deactivateStudent(
+  studentId: string
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${API_BASE_URL}/admin/students/${studentId}/deactivate`, {
+      method: 'POST',
+      headers,
+    });
+
+    const body = await res.json();
+    if (!res.ok) {
+      return { success: false, error: body.detail || 'Failed to deactivate student.' };
+    }
+    return { success: true, error: null };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Operation failed.' };
+  }
+}
+
+/* =============================================================================
+   ACADEMIC ALLOCATIONS / ASSIGNMENTS
+============================================================================= */
+
+export async function getAssignmentsList(): Promise<{
+  data: AcademicAssignment[] | null;
+  error: string | null;
+}> {
+  if (!isSupabaseConfigured) return { data: [], error: 'Supabase not configured.' };
+
+  try {
+    const { data, error } = await supabase
+      .from('faculty_subject_assignments')
+      .select(
+        'id, faculty_id, subject_id, class_id, is_active, created_at, ' +
+        'faculty:faculty(faculty_id_number, profile:profiles(full_name)), ' +
+        'subject:subjects(code, name), ' +
+        'class:classes(name)'
+      )
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const list: AcademicAssignment[] = (data || []).map((row: any) => ({
+      id: row.id,
+      faculty_id: row.faculty_id,
+      subject_id: row.subject_id,
+      class_id: row.class_id,
+      is_active: row.is_active ?? true,
+      created_at: row.created_at,
+      faculty_name: row.faculty?.profile?.full_name,
+      faculty_id_number: row.faculty?.faculty_id_number,
+      subject_code: row.subject?.code,
+      subject_name: row.subject?.name,
+      class_name: row.class?.name,
+    }));
+
+    return { data: list, error: null };
+  } catch (err: unknown) {
+    return { data: null, error: parseDatabaseError(err as { code?: string; message: string }) };
+  }
+}
+
+export async function createAssignment(
+  input: CreateAssignmentInput
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${API_BASE_URL}/admin/assignments`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(input),
+    });
+
+    const body = await res.json();
+    if (!res.ok) {
+      return { success: false, error: body.detail || 'Failed to create academic assignment.' };
+    }
+    return { success: true, error: null };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Operation failed.' };
+  }
+}
+
+export async function toggleAssignmentStatus(
+  assignmentId: string
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${API_BASE_URL}/admin/assignments/${assignmentId}/toggle-active`, {
+      method: 'PATCH',
+      headers,
+    });
+
+    const body = await res.json();
+    if (!res.ok) {
+      return { success: false, error: body.detail || 'Failed to update assignment.' };
+    }
+    return { success: true, error: null };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Operation failed.' };
   }
 }

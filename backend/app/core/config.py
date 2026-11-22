@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = Field(default="", description="Supabase project URL")
     SUPABASE_ANON_KEY: str = Field(default="", description="Supabase public anon key")
     SUPABASE_SERVICE_ROLE_KEY: str = Field(default="", description="Supabase backend service role key")
+    ATTENDANCE_ATTESTATION_SECRET: str = Field(
+        default="",
+        repr=False,
+        description="Server-only HMAC key shared with Supabase Vault for verified attendance.",
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -32,6 +37,7 @@ class Settings(BaseSettings):
             origins.extend([
                 "http://localhost:5173",
                 "http://127.0.0.1:5173",
+                "http://10.207.121.160:5173",
                 "http://localhost:3000",
                 "http://127.0.0.1:3000",
             ])
